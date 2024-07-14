@@ -154,6 +154,9 @@ if __name__ == "__main__":
             if event.type == pygame.QUIT:
                 running = False
                 print(textbox.Close())
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                ctypes.windll.user32.SetFocus(pygame.display.get_wm_info()["window"])
+            
         pygame.display.flip()
 
         clock.tick(60)
