@@ -18,6 +18,7 @@ class TextBox(TextBox):
     def __init__(self,*x,**y):
         super().__init__(*x,**y)
         self.Font = Font("Arial", 20, FontStyle.Bold)
+        self.BackColor = Color.FromArgb(0xffa08423-(1<<32))
 
 class WinFormsApp(Form):
     def __init__(self):
