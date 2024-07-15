@@ -62,6 +62,10 @@ class LayeredForm(Form):
         self.Controls.Add(self.textbox)
 
         self.Load += self.on_load
+        bitmap = self.bitmap = Bitmap(self.Width, self.Height)
+        self.rgbValues = System.Array.CreateInstance(
+            System.Byte, bitmap.Width * bitmap.Height * 3
+        )
 
     def on_load(self, sender, event):
         happ = self.Handle.ToInt64()
@@ -86,7 +90,7 @@ class LayeredForm(Form):
         happ = self.Handle.ToInt64()
         hdc = ctypes.windll.user32.GetDC(self.pygame_window_handle)
         # memdc = ctypes.windll.gdi32.CreateCompatibleDC(hdc)
-        bitmap = Bitmap(self.Width, self.Height)
+        bitmap = self.bitmap
 
         self.textbox.DrawToBitmap(bitmap, self.textbox.Bounds)
 
@@ -96,9 +100,7 @@ class LayeredForm(Form):
             PixelFormat.Format24bppRgb,
         )
         # breakpoint()
-        rgbValues = System.Array.CreateInstance(
-            System.Byte, bitmap.Width * bitmap.Height * 3
-        )
+        rgbValues = self.rgbValues
         System.Runtime.InteropServices.Marshal.Copy(
             bitmap_data.Scan0, rgbValues, 0, bitmap.Width * bitmap.Height * 3
         )
