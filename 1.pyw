@@ -20,6 +20,7 @@ from System.Windows.Forms import (
     DockStyle,
     FormBorderStyle,
     BorderStyle,
+    Timer
 )
 from System.Drawing import Color, Font, FontStyle, Bitmap, Imaging, Color, Rectangle
 from System.Drawing.Imaging import PixelFormat
@@ -73,9 +74,40 @@ class LayeredForm(Form):
         exstyle |= WS_EX_LAYERED
         ctypes.windll.user32.SetWindowLongPtrA(happ, -20, exstyle)
         ctypes.windll.user32.SetLayeredWindowAttributes(happ, 0, 1, LWA_ALPHA)
-
+    def on_timer_tick(self, sender, event):
+        self.update_bitmap()
+        if self.pygame_window_handle:
+            self.update_pygame_screen()
+    def update_bitmap(self):
+    # 更新Bitmap以反映当前的TextBox状态
+        self.textbox.DrawToBitmap(self.bitmap, self.textbox.Bounds)
+        # 将Bitmap的数据复制到rgbValues数组中
+        bitmap_data = self.bitmap.LockBits(
+            Rectangle(0, 0, self.bitmap.Width, self.bitmap.Height),
+            Imaging.ImageLockMode.ReadOnly,
+            PixelFormat.Format24bppRgb,
+        )
+        System.Runtime.InteropServices.Marshal.Copy(
+            bitmap_data.Scan0, self.rgbValues, 0, self.bitmap.Width * self.bitmap.Height * 3
+        )
+        self.bitmap.UnlockBits(bitmap_data)
+        
+    def update_pygame_screen(self):
+        # 将rgbValues转换为pygame Surface
+        surface = pygame.image.frombuffer(
+            memoryview(self.rgbValues), (self.bitmap.Width, self.bitmap.Height), "RGB"
+        )
+        surface.set_colorkey(self.BackColor_ori)
+        # 使用pygame的Surface更新pygame的屏幕
+        self.last_screen=surface
     def run(self):
-        Thread(target=lambda: Application.Run(self)).start()
+        def task():
+            self.timer = Timer()
+            self.timer.Interval = 1000//60   # 设置时间间隔，单位毫秒
+            self.timer.Tick += self.on_timer_tick
+            self.timer.Enabled = True
+            Application.Run(self)
+        Thread(target=task).start()
 
     def Close(self):
         data = self.textbox.Text
@@ -83,36 +115,9 @@ class LayeredForm(Form):
         return data
 
     def update_layered_window(self, screen, tick):
-        if tick % 2:
-            if self.last_screen is not None:
-                screen.blit(self.last_screen, self.posinpygame)
-            return
-        happ = self.Handle.ToInt64()
-        hdc = ctypes.windll.user32.GetDC(self.pygame_window_handle)
-        # memdc = ctypes.windll.gdi32.CreateCompatibleDC(hdc)
-        bitmap = self.bitmap
-
-        self.textbox.DrawToBitmap(bitmap, self.textbox.Bounds)
-
-        bitmap_data = bitmap.LockBits(
-            Rectangle(0, 0, bitmap.Width, bitmap.Height),
-            Imaging.ImageLockMode.ReadOnly,
-            PixelFormat.Format24bppRgb,
-        )
-        # breakpoint()
-        rgbValues = self.rgbValues
-        System.Runtime.InteropServices.Marshal.Copy(
-            bitmap_data.Scan0, rgbValues, 0, bitmap.Width * bitmap.Height * 3
-        )
-
-        surface = pygame.image.frombuffer(
-            memoryview(rgbValues), (bitmap.Width, bitmap.Height), "RGB"
-        )
-        bitmap.UnlockBits(bitmap_data)
-        surface.set_colorkey(self.BackColor_ori)
-
-        screen.blit(surface, self.posinpygame)
-        self.last_screen = surface
+        if self.last_screen is not None:
+            screen.blit(self.last_screen, self.posinpygame)
+        
 
 
 def create_layered_form(pygame_window_handle, pos, colorkey, color):
@@ -148,15 +153,19 @@ if __name__ == "__main__":
     running = True
     tick = 0
     while running:
+        if textbox and textbox.IsHandleCreated:
+            Application.DoEvents()
+        
         tick += 1
         screen.fill("blue")
-        pygame.draw.rect(screen, "red", pygame.Rect(30, 30, 60, 60))
+        pygame.draw.rect(screen, "red", pygame.Rect(30, 30+tick%60, 60, 60))
         textbox.update_layered_window(screen, tick)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
                 print(textbox.Close())
             if event.type == pygame.MOUSEBUTTONDOWN:
+                print(event)
                 ctypes.windll.user32.SetFocus(pygame.display.get_wm_info()["window"])
             
         pygame.display.flip()
